@@ -147,7 +147,19 @@ c#2
 
 4.  新建 Pull Request
 
+5.  帮助
+
+    如何进行issue 和 pr 的关联
+    
+    https://docs.github.com/cn/issues/tracking-your-work-with-issues/linking-a-pull-request-to-an-issue
+    
+    如何配置 checkstyle 代码检查
+    
+    https://blog.csdn.net/qq_31424825/article/details/100050445
+
 ## 关于
 
 1. 为什么选择将项目进行裁剪，而不是将整个spark代码进行迁移？
-2. 
+  目前的需求是支持列级血缘，Ushas也旨在先将列级血缘进行处理和完善，之后不排除会做更多的优化和迭代，逐步的扩大项目架构。
+  为了精简化打包，快速纳入使用，一次打包只需要5min时间
+ 
