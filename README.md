@@ -4,10 +4,7 @@
 
 Ushas 是一款在spark基础上进行封装，强化数据血缘治理的组件。传统数据治理中针对spark的表级别血缘判断虽然能一定程度上解决数据的依赖关系，但是对于精确到字段之间的关系识别则显得捉襟见肘。开发此组件的用意是为了能够加强spark在列级血缘上的追踪优势。shark代表了我们追求的不仅仅是简单的判断，而是能够精确地捕捉血缘
 
-
-
-## 软件架构
-
+## 知识铺垫
 Ushas 主要在spark-sql-catalyst和spark-sql-hive模块进行了修改，catalyst主要是负责spark在数据处理中的关系依赖管理，其中对于普通的dataset会通过如下代码，将逻辑计划处理嵌入对象内：
 ```
 Dataset.ofRows(sparkSession, logicalPlan)
@@ -16,7 +13,6 @@ Dataset.ofRows(sparkSession, logicalPlan)
 每条spark的sql，都会预先通过SparkSqlParser执行parse，parse添加了antlr4需要的词法以及处理器，通过如下方法生成逻辑计划：
 
 ```
-
 ​    astBuilder.visitSingleStatement(parser.singleStatement()) match {
 
 ​      case plan: LogicalPlan => plan
@@ -42,67 +38,22 @@ spark会通过Dataset.ofRows的方法中通过调用queryExecution的Analyzer进
 ```
 可以通过 df.queryExecution.logical来查看UnresolvedLogicalPlan，通过df.queryExecution.analyzed查看解析后的ResolvedLogicalPlan。
 Analyzer的具体识别规则如下:
-```
-  lazy val batches: Seq[Batch] = Seq(
-    Batch("Hints", fixedPoint,
-      new ResolveHints.ResolveBroadcastHints(conf),
-      ResolveHints.ResolveCoalesceHints,
-      ResolveHints.RemoveAllHints),
-    Batch("Simple Sanity Check", Once,
-      LookupFunctions),
-    Batch("Substitution", fixedPoint,
-      CTESubstitution,
-      WindowsSubstitution,
-      EliminateUnions,
-      new SubstituteUnresolvedOrdinals(conf)),
-    Batch("Resolution", fixedPoint,
-      ResolveTableValuedFunctions ::
-        ResolveRelations ::
-        ResolveReferences ::
-        ResolveCreateNamedStruct ::
-        ResolveDeserializer ::
-        ResolveNewInstance ::
-        ResolveUpCast ::
-        ResolveGroupingAnalytics ::
-        ResolvePivot ::
-        ResolveOrdinalInOrderByAndGroupBy ::
-        ResolveAggAliasInGroupBy ::
-        ResolveMissingReferences ::
-        ExtractGenerator ::
-        ResolveGenerate ::
-        ResolveFunctions ::
-        ResolveAliases ::
-        ResolveSubquery ::
-        ResolveSubqueryColumnAliases ::
-        ResolveWindowOrder ::
-        ResolveWindowFrame ::
-        ResolveNaturalAndUsingJoin ::
-        ResolveOutputRelation ::
-        ExtractWindowExpressions ::
-        GlobalAggregates ::
-        ResolveAggregateFunctions ::
-        TimeWindowing ::
-        ResolveInlineTables(conf) ::
-        ResolveHigherOrderFunctions(catalog) ::
-        ResolveLambdaVariables(conf) ::
-        ResolveTimeZone(conf) ::
-        ResolveRandomSeed ::
-        TypeCoercion.typeCoercionRules(conf) ++
-          extendedResolutionRules: _*),
-    Batch("Post-Hoc Resolution", Once, postHocResolutionRules: _*),
-    Batch("View", Once,
-      AliasViewChild(conf)),
-    Batch("Nondeterministic", Once,
-      PullOutNondeterministic),
-    Batch("UDF", Once,
-      HandleNullInputsForUDF),
-    Batch("FixNullability", Once,
-      FixNullability),
-    Batch("Subquery", Once,
-      UpdateOuterReferences),
-    Batch("Cleanup", fixedPoint,
-      CleanupAliases),
-```
+https://github.com/frankyu8/ushas/blob/a7066a67ed9c1ad9db6078d68cfff8d28cce6bd4/sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/analysis/Analyzer.scala#L152-L214
+
+## 我们做的事
+### 让logicalplan具备列级解析的能力
+我们为了让logicplan能够有列级血缘的识别能力，首先对逻辑计划的抽象类进行了修改（这里为了不影响logicplan的其他功能，所以进行了额外trait的添加），这样在Analyzer中新添列级血缘解析规则，所有的影响因素都控制在额外的trait内，不会影响spark本身的正常逻辑计划解析
+https://github.com/frankyu8/ushas/blob/a7066a67ed9c1ad9db6078d68cfff8d28cce6bd4/sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/plans/logical/LogicalPlan.scala#L30-L36
+### trait怎么进行工作的
+这里[trait]LineageHelper中携带的属性包括_lineageResolved(是否被Rule解析)，childrenLineageResolved用于递归判断所有的子逻辑计划是否已经被Rule解析过，markLineageResolved用来标注当前逻辑计划解析成功
+
+
+
+## 软件架构
+### [module]assembly
+assembly
+
+
 
 
 
@@ -144,7 +95,7 @@ c#2
 
 
 
-1.  丰富spark的sqlbase.g4语法，进行多数据源的解析支持
+1.  进行
 
 2.  将列级血缘解析进行独立，做成通用的解析器
 
