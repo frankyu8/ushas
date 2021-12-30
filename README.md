@@ -5,37 +5,25 @@
 Ushas 是一款在spark基础上进行封装，强化数据血缘治理的组件。传统数据治理中针对spark的表级别血缘判断虽然能一定程度上解决数据的依赖关系，但是对于精确到字段之间的关系识别则显得捉襟见肘。开发此组件的用意是为了能够加强spark在列级血缘上的追踪优势。shark代表了我们追求的不仅仅是简单的判断，而是能够精确地捕捉血缘
 
 ## 知识铺垫
+### dataset中的逻辑计划实现
 Ushas 主要在spark-sql-catalyst和spark-sql-hive模块进行了修改，catalyst主要是负责spark在数据处理中的关系依赖管理，其中对于普通的dataset会通过如下代码，将逻辑计划处理嵌入对象内：
 ```
 Dataset.ofRows(sparkSession, logicalPlan)
 ```
+### sql中逻辑计划实现（Parser分析）
 而spark2.0版本以上对于spark-sql的支持则是通过Antlr4进行语法解析，生成语法树，然后通过深度遍历的方式将Unresolved的语法信息处理为resolved信息。
-每条spark的sql，都会预先通过SparkSqlParser执行parse，parse添加了antlr4需要的词法以及处理器，通过如下方法生成逻辑计划：
+每条spark的sql，都会预先通过SparkSqlParser执行parse，parse添加了antlr4需要的词法以及处理器，然后生成逻辑计划：
+https://github.com/frankyu8/ushas/blob/ee36eac54b758e39689c7e2c51ea6f3aa5c27555/sql/core/src/main/scala/org/apache/spark/sql/SparkSession.scala#L641-L646
 
-```
-​    astBuilder.visitSingleStatement(parser.singleStatement()) match {
+parsePlan的内部会执行sql转化logicalplan的操作
+https://github.com/frankyu8/ushas/blob/ee36eac54b758e39689c7e2c51ea6f3aa5c27555/sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/parser/ParseDriver.scala#L69-L76
 
-​      case plan: LogicalPlan => plan
+### Analyzer分析
+ofRows中会触发Analyzer对于逻辑计划的解析，会调用Analyzer里面的batches进行UnresolveLogicalplan 到ResolveLogicalplan的转化（有则转化，无则跳过）
+https://github.com/frankyu8/ushas/blob/ee36eac54b758e39689c7e2c51ea6f3aa5c27555/sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/rules/RuleExecutor.scala#L72-L80
 
-​      case _ =>
-
-​        val position = Origin(None, None)
-
-​        throw QueryParsingErrors.sqlStatementUnsupportedError(sqlText, position)
-
-​    }
-
-```
 值得注意的是，这里生成的逻辑计划是未解析过的，即可能有未识别的数据表名，或者未识别的函数、字段名。
 spark会通过Dataset.ofRows的方法中通过调用queryExecution的Analyzer进行符合特定规则的解析(这里采用了深度遍历的形式，对语法树解析，resolveOperatorsUp/Down)，来实现命名识别，方法进入如下：
-```
-  def ofRows(sparkSession: SparkSession, logicalPlan: LogicalPlan): DataFrame = {
-//    这里在session state里面创建一个新的analyzer，用于将Unresloved逻辑计划解析成Resolved
-    val qe = sparkSession.sessionState.executePlan(logicalPlan)
-    qe.assertAnalyzed()
-    new Dataset[Row](sparkSession, qe, RowEncoder(qe.analyzed.schema))
-  }
-```
 可以通过 df.queryExecution.logical来查看UnresolvedLogicalPlan，通过df.queryExecution.analyzed查看解析后的ResolvedLogicalPlan。
 Analyzer的具体识别规则如下:
 https://github.com/frankyu8/ushas/blob/a7066a67ed9c1ad9db6078d68cfff8d28cce6bd4/sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/analysis/Analyzer.scala#L152-L214
