@@ -47,19 +47,21 @@ https://github.com/frankyu8/ushas/blob/a7066a67ed9c1ad9db6078d68cfff8d28cce6bd4/
 ### trait怎么进行工作的
 这里[trait]LineageHelper中携带的属性包括_lineageResolved(是否被Rule解析)，childrenLineageResolved用于递归判断所有的子逻辑计划是否已经被Rule解析过，markLineageResolved用来标注当前逻辑计划解析成功
 https://github.com/frankyu8/ushas/blob/a46317df9396161a257a2388938289926ff7a46a/sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/plans/logical/lineageCollect/LineageHelper.scala#L24-L45
-然后所有的列级对象都会被lienageChildren 容器进行接手
+然后所有的列级对象都会被lineageChildren 容器进行接手。
 
 ### 列级对象存在的合理性
-逻辑计划，其实是针对算子进行操作的，并没有对算子里面的涉及成员进行操作，比如select a,b,c  from table 那么这里只会生成一个RelationLogicplan 和 ProjectLogicplan, 其中 ProjectLogicplan里面对应的projectList（即所有的字段expression）才是我们关心的列级血缘对象，为了不在projectList里面直接对expression进行操作，所以我们预先定义了列级对象（和expression一一对应），简单的记录了每个expression里面我们所关心的属性，然后放入lineageChildren中。只要确保Analyzer工作时，每次深度遍历，在不参与计算的节点将lineageChildren进行复制，携带到上层节点，在对应需要操作的节点进行关系的判断，即可保证列级字段的正确解析。
+逻辑计划，其实是针对算子进行操作的，并没有对算子里面的涉及成员进行操作，比如select a,b,c  from table 那么这里只会生成一个RelationLogicplan 和 ProjectLogicplan, 其中 ProjectLogicplan里面对应的projectList（即所有的字段expression）才是我们关心的列级血缘对象，为了不在projectList里面直接对expression进行操作，所以我们预先定义了列级对象（和expression一一对应），简单的记录了每个expression里面我们所关心的属性[extend treeNode]，然后放入lineageChildren中。只要确保Analyzer工作时，每次深度遍历，在不参与计算的节点将lineageChildren进行复制，携带到上层节点，在对应需要操作的节点进行关系的判断，即可保证列级字段的正确解析。
+列级对象的子类包括ExpressionColumn,RelationColumn以及UnionColumn，ExpressionColumn主要记录的是Project逻辑计划里面的expression，RelationColumn主要记录的是LeafNode里面的从属关系,UnionColumn主要是记录了特殊的列字段关系，因为需要识别到相应的right lineageChildren信息。
+https://github.com/frankyu8/ushas/tree/main/sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/lineage
 
 ### rule是怎么进行工作的
 因为logicplan是封装在所有的df对象内的，所以每次的df对象进行方法的操作，都会force 逻辑计划进行Analyzer的解析。我们在Analyzer的规则里面加上了自己的列级血缘判断规则
 https://github.com/frankyu8/ushas/blob/a46317df9396161a257a2388938289926ff7a46a/sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/analysis/Analyzer.scala#L211-L212
 我们新增了两个解析规则，一个是针对Relation的解析规则（即字段血缘的叶子节点判断），一个是针对Expression的解析规则（即字段血缘的所有中间关系判断）
 Relation的解析规则：
-
+https://github.com/frankyu8/ushas/blob/796fc00b72ed64b6e1f5b3b0544b6b765eadc327/sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/analysis/ResolveLineage.scala#L120
 Expression的解析规则：
-
+https://github.com/frankyu8/ushas/blob/796fc00b72ed64b6e1f5b3b0544b6b765eadc327/sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/analysis/ResolveLineage.scala#L29
 
 
 
