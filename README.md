@@ -17,7 +17,7 @@
   The internal parsePlan will perform the operation of sql conversion logicalplan
   https://github.com/frankyu8/ushas/blob/ee36eac54b758e39689c7e2c51ea6f3aa5c27555/sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/parser/ParseDriver.scala#L69-L76
 
-* ### Analyzer分析
+* ### Analyzer
   OfRows will trigger Analyzer to analyze the logical plan, and will call the batches in Analyzer to convert from UnresolveLogicalplan to ResolveLogicalplan (convert if there is, skip if not)
   https://github.com/frankyu8/ushas/blob/ee36eac54b758e39689c7e2c51ea6f3aa5c27555/sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/rules/RuleExecutor.scala#L72-L80
 
