@@ -1,5 +1,5 @@
 # Ushas
-
+[中文说明](https://github.com/frankyu8/ushas/blob/main/README-CN.md)
 ## Description
 *
   Ushas is a component that is packaged on the basis of spark to strengthen the governance of data lineage. Although the table-level lineage judgment for spark in traditional data governance can solve the dependence of data to a certain extent, it is difficult to identify the relationship between fields as accurate as possible. The purpose of developing this component is to strengthen spark's tracking advantage in column-level lineage. Ushas represents that what we pursue is not just a simple judgment, but the ability to accurately capture relationship.
